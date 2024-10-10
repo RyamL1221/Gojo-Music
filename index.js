@@ -11,12 +11,12 @@ const client = new Client({
       GatewayIntentBits.GuildVoiceStates,
     ]
   });
-client.login(config.token);
 
-// Add listeners for startup
+// ready checks
 client.once('ready', () => {
     console.log('Ready!');
 });
 client.on("error", console.error);
 client.on("warn", console.warn);
 
+client.login(config.token);
