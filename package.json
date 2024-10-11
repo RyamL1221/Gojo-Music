@@ -10,7 +10,7 @@
   "description": "Gojo Music Bot",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "jest"
   },
   "author": "Depressed Pizza Rolls",
   "license": "ISC",
