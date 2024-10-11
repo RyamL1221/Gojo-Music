@@ -9,7 +9,7 @@ describe('Queue', () => {
     queue = new Queue();
   });
 
-  test('should enqueue items correctly', () => {
+  test('queue.enqueue()', () => {
     queue.enqueue('item1');
     queue.enqueue('item2');
     queue.enqueue('item3');
@@ -17,7 +17,7 @@ describe('Queue', () => {
     expect(queue.peek()).toBe('item1');
   });
 
-  test('should dequeue items correctly', () => {
+  test('queue.dequeue()', () => {
     queue.enqueue('item1');
     queue.enqueue('item2');
     expect(queue.dequeue()).toBe('item1');
@@ -25,27 +25,27 @@ describe('Queue', () => {
     expect(queue.peek()).toBe('item2');
   });
 
-  test('should return null when dequeuing an empty queue', () => {
+  test('dequeuing empty queue', () => {
     expect(queue.dequeue()).toBeNull();
   });
 
-  test('should return the correct front item with peek', () => {
+  test('queue.peek()', () => {
     queue.enqueue('item1');
     queue.enqueue('item2');
     expect(queue.peek()).toBe('item1');
   });
 
-  test('should return null when peeking an empty queue', () => {
+  test('peeking an empty queue', () => {
     expect(queue.peek()).toBeNull();
   });
 
-  test('should correctly report if the queue is empty', () => {
+  test('queue.isEmpty()', () => {
     expect(queue.isEmpty()).toBe(true);
     queue.enqueue('item1');
     expect(queue.isEmpty()).toBe(false);
   });
 
-  test('should return the correct length of the queue', () => {
+  test('queue.length()', () => {
     expect(queue.length()).toBe(0);
     queue.enqueue('item1');
     queue.enqueue('item2');
@@ -54,7 +54,7 @@ describe('Queue', () => {
     expect(queue.length()).toBe(1);
   });
 
-  test('should clear the queue', () => {
+  test('queue.clear()', () => {
     queue.enqueue('item1');
     queue.enqueue('item2');
     queue.clear();
@@ -62,7 +62,7 @@ describe('Queue', () => {
     expect(queue.isEmpty()).toBe(true);
   });
 
-  test('should return the correct queue items', () => {
+  test('queue.getQueue()', () => {
     queue.enqueue('item1');
     queue.enqueue('item2');
     expect(queue.getQueue()).toEqual(['item1', 'item2']);
