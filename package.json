@@ -1,6 +1,8 @@
 {
   "dependencies": {
-    "discord.js": "^14.16.3"
+    "@discordjs/voice": "^0.17.0",
+    "discord.js": "^14.16.3",
+    "ytdl-core": "^4.11.5"
   },
   "name": "gojo-music",
   "version": "1.0.0",
