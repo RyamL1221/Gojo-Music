@@ -11,10 +11,10 @@ const {
   createAudioPlayer,
   createAudioResource,
   NoSubscriberBehavior,
-  getVoiceConnection,
-  AudioPlayerStatus
+  AudioPlayerStatus,
+  StreamType,
 } = require('@discordjs/voice');
-const ytdl = require("@distube/ytdl-core"); 
+const ytdl = require('@distube/ytdl-core');
 const config = require('../config.json');
 const Queue = require('./Queue.js');
 
@@ -55,7 +55,6 @@ const rest = new REST({ version: '10' }).setToken(config.token);
 
 (async () => {
   try {
-    // Deleting existing commands for the specific guild
     console.log('Deleting old application (/) commands.');
     const existingCommands = await rest.get(
       Routes.applicationGuildCommands(config.clientId, config.guildId)
@@ -69,7 +68,6 @@ const rest = new REST({ version: '10' }).setToken(config.token);
     }
     console.log(`Successfully deleted ${count} old application (/) commands.`);
 
-    // Refreshing commands for the specific guild
     console.log('Started refreshing application (/) commands.');
     await rest.put(Routes.applicationGuildCommands(config.clientId, config.guildId), { body: commands });
     console.log('Successfully reloaded application (/) commands.');
@@ -101,14 +99,11 @@ client.on('interactionCreate', async (interaction) => {
   const { commandName } = interaction;
   switch (commandName) {
     case 'play': {
-
-      // Check if the user is in a voice channel
       const voiceChannel = interaction.member.voice.channel;
       if (!voiceChannel) {
         return interaction.reply('You need to be in a voice channel to play music!');
       }
 
-      // Join the voice channel if not already in it
       if (!currentConnection) {
         currentConnection = joinVoiceChannel({
           channelId: voiceChannel.id,
@@ -117,11 +112,13 @@ client.on('interactionCreate', async (interaction) => {
         });
       }
 
-      // read in url and add it to queue
       const url = interaction.options.getString('url');
       queue.enqueue(url);
 
-      if (player.state.status === AudioPlayerStatus.Idle) {
+      if (  
+        player.state.status !== AudioPlayerStatus.Playing &&
+        player.state.status !== AudioPlayerStatus.Buffering
+      ) {
         console.log(`Now playing ${url} !`);
         await interaction.reply(`Now playing ${url} !`);
         playNextInQueue();
@@ -131,7 +128,6 @@ client.on('interactionCreate', async (interaction) => {
       }
       break;
     }
-    // Disconnect the user from their current voice channel
     case 'disconnect': {
       const voiceChannel = interaction.member.voice.channel;
       if (voiceChannel) {
@@ -144,17 +140,22 @@ client.on('interactionCreate', async (interaction) => {
       }
       break;
     }
-    // Disconnect the bot from the voice channel
     case 'skibidi': {
       if (currentConnection) {
+        queue.clear();
         currentConnection.destroy();
+        currentConnection = null;
+        currentInteraction = null;
+        player.stop();
+        player.removeAllListeners();
+        player.unpause();
+
         await interaction.reply('Disconnected from the voice channel.');
       } else {
         await interaction.reply('I am not connected to a voice channel.');
       }
       break;
     }
-    
     default:
       break;
   }
@@ -162,25 +163,30 @@ client.on('interactionCreate', async (interaction) => {
 
 // Function to play the next song in the queue
 async function playNextInQueue() {
-  if (queue.isEmpty()) return;
+  if (player.state.status === AudioPlayerStatus.Playing || queue.isEmpty()) return;
 
   const url = queue.dequeue();
-  const stream = ytdl(url, {
-    filter: 'audioonly',
-    highWaterMark: 1 << 25,
-  });
-  const resource = createAudioResource(stream);
-  player.play(resource);
-  currentConnection.subscribe(player);
+  try {
+    const stream = await ytdl(url, {
+      filter: 'audioonly',
+      highWaterMark: 1 << 25,
+    });
 
-  player.once(AudioPlayerStatus.Idle, () => {
-    if (!queue.isEmpty()) {
-      const nextUrl = queue.peek();
-      console.log(`Now playing ${nextUrl} !`);
-      currentInteraction.channel.send(`Now playing ${nextUrl} !`);
-    }
-    playNextInQueue();
-  });
+    const resource = createAudioResource(stream, {
+      inputType: StreamType.Arbitrary,
+    });
+
+    player.play(resource);
+    currentConnection.subscribe(player);
+
+    player.once(AudioPlayerStatus.Idle, () => {
+      playNextInQueue();
+    });
+  } catch (error) {
+    console.error('Error in audio player:', error);
+    currentInteraction.channel.send(`There was an error playing the URL: ${url}.`);
+    playNextInQueue(); // Move to the next song in the queue
+  }
 }
 
 // Handle audio player errors
