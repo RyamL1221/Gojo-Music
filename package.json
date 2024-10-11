@@ -1,8 +1,9 @@
 {
   "dependencies": {
     "@discordjs/voice": "^0.17.0",
+    "@distube/ytdl-core": "^4.14.4",
     "discord.js": "^14.16.3",
-    "ytdl-core": "^4.11.5"
+    "libsodium-wrappers": "^0.7.15"
   },
   "name": "gojo-music",
   "version": "1.0.0",
