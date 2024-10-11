@@ -40,7 +40,7 @@ class Queue {
         this.backIndex = 0;
     }
 
-    print() {
+    getQueue() {
         return this.items;
     }
 }
