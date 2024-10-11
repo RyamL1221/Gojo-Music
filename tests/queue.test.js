@@ -1,5 +1,5 @@
 // Import the Queue class
-const Queue = require('./queue.js');
+const Queue = require('../src/Queue.js');
 
 // Unit tests using Jest
 describe('Queue', () => {

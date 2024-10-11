@@ -15,8 +15,8 @@ const {
   AudioPlayerStatus
 } = require('@discordjs/voice');
 const ytdl = require("@distube/ytdl-core"); 
-const config = require('./config.json');
-const Queue = require('./queue.js');
+const config = require('../config.json');
+const Queue = require('./Queue.js');
 
 // Create a new client instance
 const client = new Client({
