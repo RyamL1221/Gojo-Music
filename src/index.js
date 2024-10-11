@@ -55,23 +55,23 @@ const rest = new REST({ version: '10' }).setToken(config.token);
 
 (async () => {
   try {
-    // deleting existing commands
+    // Deleting existing commands for the specific guild
     console.log('Deleting old application (/) commands.');
     const existingCommands = await rest.get(
-      Routes.applicationCommands(config.clientId)
+      Routes.applicationGuildCommands(config.clientId, config.guildId)
     );
     let count = 0;
     for (const command of existingCommands) {
       await rest.delete(
-        `${Routes.applicationCommands(config.clientId)}/${command.id}`
+        `${Routes.applicationGuildCommands(config.clientId, config.guildId)}/${command.id}`
       );
       count++;
     }
     console.log(`Successfully deleted ${count} old application (/) commands.`);
 
-    // refreshing commands
+    // Refreshing commands for the specific guild
     console.log('Started refreshing application (/) commands.');
-    await rest.put(Routes.applicationCommands(config.clientId), { body: commands });
+    await rest.put(Routes.applicationGuildCommands(config.clientId, config.guildId), { body: commands });
     console.log('Successfully reloaded application (/) commands.');
   } catch (error) {
     console.error(error);
@@ -146,9 +146,8 @@ client.on('interactionCreate', async (interaction) => {
     }
     // Disconnect the bot from the voice channel
     case 'skibidi': {
-      const connection = getVoiceConnection(interaction.guild.id);
-      if (connection) {
-        connection.destroy();
+      if (currentConnection) {
+        currentConnection.destroy();
         await interaction.reply('Disconnected from the voice channel.');
       } else {
         await interaction.reply('I am not connected to a voice channel.');
