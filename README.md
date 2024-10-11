@@ -8,4 +8,4 @@ Welcome to the dev team of Gojo Music. Below are instructions on how to install 
 
 1. `git clone https://github.com/RyamL1221/Gojo-Music && cd Gojo-Music`
 2. `npm i`
-3. Run the bot with `node index.js`
+3. Run the bot with `npm start`
