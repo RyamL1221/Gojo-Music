@@ -21,17 +21,7 @@ const Queue = require("./Queue.js");
 const http = require("http");
 
 // Cookie setup
-const cookies = [
-  { name: "cookie1", value: "MnS5aKFuYaTXOLlQKuZv2vccVWZTefui7emGbLJzRcoTYiPiRD1r1ePU0CgA64Qzn6IM9FZBlUJ4JmefiBYHObn6e4ZWwUZwN1j4Pbfu8SqAABWQKuRUtOdwXKBpO3F9ZrRTqdDYL1jO6cguy3dZ_B2jFt8DZw==" },
-  { name: "cookie2", value: "MnT8bagx85JBO_xVrK3sOw8PkohV9fRRO7tzRBGfRJ6U7hYLkZRp1nfVG1fBiW9chU7cJI0zTuHW43el1g8T90MV2uA_clgM25mbKp-1nz8TNRrkPNfIW8MMtpu--ibPoWjDJwzUzauspUNskk9aPgC6EmJ8WQ==" },
-];
-
-const agentOptions = {
-  pipelining: 5,
-  maxRedirections: 0,
-};
-
-const agent = ytdl.createAgent(cookies, agentOptions);
+const cookies = "MnS5aKFuYaTXOLlQKuZv2vccVWZTefui7emGbLJzRcoTYiPiRD1r1ePU0CgA64Qzn6IM9FZBlUJ4JmefiBYHObn6e4ZWwUZwN1j4Pbfu8SqAABWQKuRUtOdwXKBpO3F9ZrRTqdDYL1jO6cguy3dZ_B2jFt8DZw==; MnT8bagx85JBO_xVrK3sOw8PkohV9fRRO7tzRBGfRJ6U7hYLkZRp1nfVG1fBiW9chU7cJI0zTuHW43el1g8T90MV2uA_clgM25mbKp-1nz8TNRrkPNfIW8MMtpu--ibPoWjDJwzUzauspUNskk9aPgC6EmJ8WQ==";
 
 // Create a new client instance
 const client = new Client({
@@ -55,10 +45,17 @@ const commands = [
     .setName("play")
     .setDescription("Plays audio from a YouTube link")
     .addStringOption((option) =>
-      option.setName("url").setDescription("The YouTube URL to play").setRequired(true)
+      option
+        .setName("url")
+        .setDescription("The YouTube URL to play")
+        .setRequired(true),
     ),
-  new SlashCommandBuilder().setName("disconnect").setDescription("Disconnects the bot from the voice channel"),
-  new SlashCommandBuilder().setName("skibidi").setDescription("Only use if you're sigma :nerd:"),
+  new SlashCommandBuilder()
+    .setName("disconnect")
+    .setDescription("Disconnects the bot from the voice channel"),
+  new SlashCommandBuilder()
+    .setName("skibidi")
+    .setDescription("Only use if you're sigma :nerd:"),
 ].map((command) => command.toJSON());
 
 // Register slash commands
@@ -66,16 +63,22 @@ const rest = new REST({ version: "10" }).setToken(config.token);
 (async () => {
   try {
     console.log("Deleting old application (/) commands.");
-    const existingCommands = await rest.get(Routes.applicationCommands(config.clientId));
+    const existingCommands = await rest.get(
+      Routes.applicationCommands(config.clientId),
+    );
     let count = 0;
     for (const command of existingCommands) {
-      await rest.delete(`${Routes.applicationCommands(config.clientId)}/${command.id}`);
+      await rest.delete(
+        `${Routes.applicationCommands(config.clientId)}/${command.id}`,
+      );
       count++;
     }
     console.log(`Successfully deleted ${count} old application (/) commands.`);
 
     console.log("Started refreshing application (/) commands.");
-    await rest.put(Routes.applicationCommands(config.clientId), { body: commands });
+    await rest.put(Routes.applicationCommands(config.clientId), {
+      body: commands,
+    });
     console.log("Successfully reloaded application (/) commands.");
   } catch (error) {
     console.error(error);
@@ -152,9 +155,11 @@ client.on("interactionCreate", async (interaction) => {
           await interaction.guild.members.cache
             .get(interaction.member.id)
             .voice.disconnect();
-            await interaction.editReply("Disconnected from the voice channel.");
+          await interaction.editReply("Disconnected from the voice channel.");
         } else {
-          await interaction.editReply("I am not connected to any voice channel.");
+          await interaction.editReply(
+            "I am not connected to any voice channel.",
+          );
         }
         break;
       }
@@ -169,12 +174,17 @@ client.on("interactionCreate", async (interaction) => {
           player.stop();
           await interaction.editReply("Disconnected from the voice channel.");
         } else {
-          await interaction.editReply("I am not connected to any voice channel.");
+          await interaction.editReply(
+            "I am not connected to any voice channel.",
+          );
         }
         break;
       }
       default:
-        await interaction.reply({ content: "Unknown command.", ephemeral: true });
+        await interaction.reply({
+          content: "Unknown command.",
+          ephemeral: true,
+        });
         break;
     }
   } catch (error) {
@@ -195,14 +205,19 @@ client.on("interactionCreate", async (interaction) => {
 
 // Function to play the next song in the queue
 async function playNextInQueue(interaction, connection) {
-  if (player.state.status === AudioPlayerStatus.Playing || queue.isEmpty()) return;
+  if (player.state.status === AudioPlayerStatus.Playing || queue.isEmpty())
+    return;
 
   const url = queue.dequeue();
   try {
     const stream = await ytdl(url, {
       filter: "audioonly",
       highWaterMark: 1 << 25,
-      agent,
+      requestOptions: {
+        headers: {
+          cookie: cookies,
+        },
+      },
     });
 
     const resource = createAudioResource(stream, {
