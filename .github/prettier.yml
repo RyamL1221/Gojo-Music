@@ -1,0 +1,30 @@
+name: Prettier Check
+
+on:
+  pull_request:
+    branches: main 
+
+jobs:
+  prettier:
+    name: Run Prettier
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout the repository code
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      # Set up Node.js environment
+      - name: Setup Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20.17.0' # Specify the Node.js version you use
+
+      # Install dependencies
+      - name: Install Dependencies
+        run: npm install
+
+      # Run Prettier to check formatting
+      - name: Run Prettier Check
+        run: npx prettier . --check
+
