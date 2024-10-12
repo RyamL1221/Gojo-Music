@@ -25,18 +25,18 @@ const http = require("http");
 const cookies = [
   {
     name: "cookie1",
-    value: config.cookie1_value
+    value: config.cookie1_value,
   },
   {
     name: "cookie2",
-    value: config.cookie2_value
+    value: config.cookie2_value,
   },
 ];
 
 // Optional agent options (these are examples and can be adjusted as needed)
 const agentOptions = {
   pipelining: 5,
-  maxRedirections: 0
+  maxRedirections: 1,
 };
 
 // Create the agent once
@@ -95,9 +95,12 @@ const rest = new REST({ version: "10" }).setToken(config.token);
     console.log(`Successfully deleted ${count} old application (/) commands.`);
 
     console.log("Started refreshing application (/) commands.");
-    await rest.put(Routes.applicationGuildCommands(config.clientId, config.guildId), {
-      body: commands,
-    });
+    await rest.put(
+      Routes.applicationGuildCommands(config.clientId, config.guildId),
+      {
+        body: commands,
+      },
+    );
     console.log("Successfully reloaded application (/) commands.");
   } catch (error) {
     console.error(error);
@@ -130,10 +133,10 @@ client.on("interactionCreate", async (interaction) => {
             ephemeral: true,
           });
         }
-      
+
         // Defer the reply immediately to extend the interaction time
         await interaction.deferReply();
-      
+
         // Join the voice channel if not already connected
         let connection = getVoiceConnection(interaction.guild.id);
         if (!connection) {
@@ -143,11 +146,11 @@ client.on("interactionCreate", async (interaction) => {
             adapterCreator: interaction.guild.voiceAdapterCreator,
           });
         }
-      
+
         const url = interaction.options.getString("url");
         queue.enqueue(url);
         console.log(`Enqueued: ${url}`);
-      
+
         if (
           player.state.status !== AudioPlayerStatus.Playing &&
           player.state.status !== AudioPlayerStatus.Buffering
@@ -160,7 +163,7 @@ client.on("interactionCreate", async (interaction) => {
           await interaction.editReply(`Added ${url} to queue!`);
         }
         break;
-      }      
+      }
       case "disconnect": {
         const voiceChannel = interaction.member.voice.channel;
         if (!voiceChannel) {
@@ -274,11 +277,12 @@ async function playNextInQueue(interaction, connection) {
     await interaction.channel.send(`Now playing ${url}!`);
   } catch (error) {
     console.error("Error in audio player:", error);
-    await interaction.channel.send(`There was an error playing the URL: ${url}.`);
+    await interaction.channel.send(
+      `There was an error playing the URL: ${url}.`,
+    );
     playNextInQueue(interaction, connection); // Attempt to play the next song
   }
 }
-
 
 // Handle audio player errors
 player.on("error", (error) => {
