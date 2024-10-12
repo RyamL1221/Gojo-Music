@@ -13,10 +13,37 @@ const {
   NoSubscriberBehavior,
   AudioPlayerStatus,
   StreamType,
+  getVoiceConnection,
 } = require("@discordjs/voice");
 const ytdl = require("@distube/ytdl-core");
 const config = require("../config.json");
 const Queue = require("./Queue.js");
+const http = require("http");
+
+// Cookie setup
+
+const cookies = [
+  {
+    name: "cookie1",
+    value:
+      "MnS5aKFuYaTXOLlQKuZv2vccVWZTefui7emGbLJzRcoTYiPiRD1r1ePU0CgA64Qzn6IM9FZBlUJ4JmefiBYHObn6e4ZWwUZwN1j4Pbfu8SqAABWQKuRUtOdwXKBpO3F9ZrRTqdDYL1jO6cguy3dZ_B2jFt8DZw==",
+  },
+  {
+    name: "cookie2",
+    value:
+      "MnT8bagx85JBO_xVrK3sOw8PkohV9fRRO7tzRBGfRJ6U7hYLkZRp1nfVG1fBiW9chU7cJI0zTuHW43el1g8T90MV2uA_clgM25mbKp-1nz8TNRrkPNfIW8MMtpu--ibPoWjDJwzUzauspUNskk9aPgC6EmJ8WQ==",
+  },
+];
+
+// Optional agent options (these are examples and can be adjusted as needed)
+const agentOptions = {
+  pipelining: 5,
+  maxRedirections: 0,
+  localAddress: "127.0.0.1",
+};
+
+// Create the agent once
+const agent = ytdl.createAgent(cookies, agentOptions);
 
 // Create a new client instance
 const client = new Client({
@@ -55,27 +82,25 @@ const commands = [
 
 // Register slash commands
 const rest = new REST({ version: "10" }).setToken(config.token);
-
 (async () => {
   try {
     console.log("Deleting old application (/) commands.");
     const existingCommands = await rest.get(
-      Routes.applicationGuildCommands(config.clientId, config.guildId),
+      Routes.applicationCommands(config.clientId),
     );
     let count = 0;
     for (const command of existingCommands) {
       await rest.delete(
-        `${Routes.applicationGuildCommands(config.clientId, config.guildId)}/${command.id}`,
+        `${Routes.applicationCommands(config.clientId)}/${command.id}`,
       );
       count++;
     }
     console.log(`Successfully deleted ${count} old application (/) commands.`);
 
     console.log("Started refreshing application (/) commands.");
-    await rest.put(
-      Routes.applicationGuildCommands(config.clientId, config.guildId),
-      { body: commands },
-    );
+    await rest.put(Routes.applicationCommands(config.clientId), {
+      body: commands,
+    });
     console.log("Successfully reloaded application (/) commands.");
   } catch (error) {
     console.error(error);
@@ -92,87 +117,148 @@ const player = createAudioPlayer({
 // Initialize the queue
 const queue = new Queue();
 
-// Global connection and interaction variable
-let currentConnection = null;
-let currentInteraction = null;
-
 // Handle interactions
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isCommand()) return;
 
-  currentInteraction = interaction;
-
   const { commandName } = interaction;
-  switch (commandName) {
-    case "play": {
-      const voiceChannel = interaction.member.voice.channel;
-      if (!voiceChannel) {
-        return interaction.reply(
-          "You need to be in a voice channel to play music!",
-        );
-      }
 
-      if (!currentConnection) {
-        currentConnection = joinVoiceChannel({
+  try {
+    switch (commandName) {
+      case "play": {
+        const voiceChannel = interaction.member.voice.channel;
+        if (!voiceChannel) {
+          return interaction.reply({
+            content: "You need to be in a voice channel to play music!",
+            ephemeral: true,
+          });
+        }
+
+        // Defer the reply if processing might take time
+        await interaction.deferReply();
+
+        // Join the voice channel if not already connected
+        const connection = joinVoiceChannel({
           channelId: voiceChannel.id,
           guildId: interaction.guild.id,
           adapterCreator: interaction.guild.voiceAdapterCreator,
         });
-      }
 
-      const url = interaction.options.getString("url");
-      queue.enqueue(url);
+        const url = interaction.options.getString("url");
+        queue.enqueue(url);
 
-      if (
-        player.state.status !== AudioPlayerStatus.Playing &&
-        player.state.status !== AudioPlayerStatus.Buffering
-      ) {
-        console.log(`Now playing ${url} !`);
-        await interaction.reply(`Now playing ${url} !`);
-        playNextInQueue();
-      } else {
-        console.log(`Added ${url} to queue!`);
-        await interaction.reply(`Added ${url} to queue!`);
+        if (
+          player.state.status !== AudioPlayerStatus.Playing &&
+          player.state.status !== AudioPlayerStatus.Buffering
+        ) {
+          console.log(`Now playing ${url}!`);
+          await interaction.editReply(`Now playing ${url} !`);
+          playNextInQueue(interaction, connection);
+        } else {
+          console.log(`Added ${url} to queue!`);
+          await interaction.editReply(`Added ${url} to queue!`);
+        }
+        break;
       }
-      break;
+      case "disconnect": {
+        const voiceChannel = interaction.member.voice.channel;
+        if (!voiceChannel) {
+          return interaction.reply({
+            content: "You are not in a voice channel.",
+            ephemeral: true,
+          });
+        }
+
+        // Defer the reply
+        await interaction.deferReply();
+
+        // Disconnect the user
+        if (voiceChannel) {
+          await interaction.guild.members.cache
+            .get(interaction.member.id)
+            .voice.disconnect();
+          await interaction.editReply("Disconnected from the voice channel.");
+        } else {
+          await interaction.editReply(
+            "I am not connected to any voice channel.",
+          );
+        }
+        break;
+      }
+      case "skibidi": {
+        // Defer the reply
+        await interaction.deferReply();
+
+        const connection = getVoiceConnection(interaction.guild.id);
+        if (connection) {
+          queue.clear();
+          connection.destroy();
+          player.stop();
+          await interaction.editReply("Disconnected from the voice channel.");
+        } else {
+          await interaction.editReply(
+            "I am not connected to any voice channel.",
+          );
+        }
+        break;
+      }
+      default:
+        await interaction.reply({
+          content: "Unknown command.",
+          ephemeral: true,
+        });
+        break;
     }
-    case "disconnect": {
-      const voiceChannel = interaction.member.voice.channel;
-      if (voiceChannel) {
-        await interaction.guild.members.cache
-          .get(interaction.member.id)
-          .voice.disconnect();
-        await interaction.reply(
-          "You little skibidi man I'm always too steps ahead",
+  } catch (error) {
+    console.error("Error handling interaction:", error);
+    if (interaction.deferred) {
+      try {
+        await interaction.editReply({
+          content: "There was an error while executing this command.",
+        });
+      } catch (editError) {
+        console.error("Failed to edit reply after error:", editError);
+        // As a last resort, try sending a message to the channel
+        try {
+          await interaction.channel.send(
+            "There was an error while executing this command.",
+          );
+        } catch (sendError) {
+          console.error("Failed to send error message to channel:", sendError);
+        }
+      }
+    } else if (!interaction.replied) {
+      try {
+        await interaction.reply({
+          content: "There was an error while executing this command.",
+          ephemeral: true,
+        });
+      } catch (replyError) {
+        console.error("Failed to reply with error:", replyError);
+        // As a last resort, try sending a message to the channel
+        try {
+          await interaction.channel.send(
+            "There was an error while executing this command.",
+          );
+        } catch (sendError) {
+          console.error("Failed to send error message to channel:", sendError);
+        }
+      }
+    } else {
+      // Interaction already replied to; send a message to the channel
+      try {
+        await interaction.channel.send(
+          "There was an error while executing this command.",
         );
-      } else {
-        await interaction.reply("You are not in a voice channel.");
+      } catch (sendError) {
+        console.error("Failed to send error message to channel:", sendError);
       }
-      break;
     }
-    case "skibidi": {
-      if (currentConnection) {
-        queue.clear();
-        currentConnection.destroy();
-        currentConnection = null;
-        currentInteraction = null;
-        player.stop();
-        player.removeAllListeners();
-        player.unpause();
-
-        await interaction.reply("Disconnected from the voice channel.");
-      } else {
-        await interaction.reply("I am not connected to a voice channel.");
-      }
-      break;
-    }
-    default:
-      break;
   }
 });
 
 // Function to play the next song in the queue
-async function playNextInQueue() {
+async function playNextInQueue(interaction, connection) {
   if (player.state.status === AudioPlayerStatus.Playing || queue.isEmpty())
     return;
 
@@ -181,6 +267,7 @@ async function playNextInQueue() {
     const stream = await ytdl(url, {
       filter: "audioonly",
       highWaterMark: 1 << 25,
+      agent,
     });
 
     const resource = createAudioResource(stream, {
@@ -188,17 +275,17 @@ async function playNextInQueue() {
     });
 
     player.play(resource);
-    currentConnection.subscribe(player);
+    connection.subscribe(player);
 
     player.once(AudioPlayerStatus.Idle, () => {
-      playNextInQueue();
+      playNextInQueue(interaction, connection);
     });
+
+    console.log(`Now playing ${url}!`);
+    await interaction.channel.send(`Now playing ${url}!`);
   } catch (error) {
     console.error("Error in audio player:", error);
-    currentInteraction.channel.send(
-      `There was an error playing the URL: ${url}.`,
-    );
-    playNextInQueue(); // Move to the next song in the queue
+    await interaction.channel.send(`There was an error playing the URL: ${url}.`);
   }
 }
 
@@ -209,3 +296,14 @@ player.on("error", (error) => {
 
 // Login to Discord with token
 client.login(config.token);
+
+// Create a simple server to keep the bot alive
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { "Content-Type": "text/plain" });
+  res.end("Discord bot is running\n");
+});
+
+const PORT = process.env.PORT || 3000; // Use PORT environment variable or default to 3000
+server.listen(PORT, () => {
+  console.log(`Server is listening on port ${PORT}`);
+});
