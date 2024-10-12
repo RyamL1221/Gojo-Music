@@ -211,16 +211,48 @@ client.on("interactionCreate", async (interaction) => {
     }
   } catch (error) {
     console.error("Error handling interaction:", error);
-    if (interaction.deferred || interaction.replied) {
-      interaction.followUp({
-        content: "There was an error while executing this command.",
-        ephemeral: true,
-      });
+    if (interaction.deferred) {
+      try {
+        await interaction.editReply({
+          content: "There was an error while executing this command.",
+        });
+      } catch (editError) {
+        console.error("Failed to edit reply after error:", editError);
+        // As a last resort, try sending a message to the channel
+        try {
+          await interaction.channel.send(
+            "There was an error while executing this command.",
+          );
+        } catch (sendError) {
+          console.error("Failed to send error message to channel:", sendError);
+        }
+      }
+    } else if (!interaction.replied) {
+      try {
+        await interaction.reply({
+          content: "There was an error while executing this command.",
+          ephemeral: true,
+        });
+      } catch (replyError) {
+        console.error("Failed to reply with error:", replyError);
+        // As a last resort, try sending a message to the channel
+        try {
+          await interaction.channel.send(
+            "There was an error while executing this command.",
+          );
+        } catch (sendError) {
+          console.error("Failed to send error message to channel:", sendError);
+        }
+      }
     } else {
-      interaction.reply({
-        content: "There was an error while executing this command.",
-        ephemeral: true,
-      });
+      // Interaction already replied to; send a message to the channel
+      try {
+        await interaction.channel.send(
+          "There was an error while executing this command.",
+        );
+      } catch (sendError) {
+        console.error("Failed to send error message to channel:", sendError);
+      }
     }
   }
 });
@@ -250,23 +282,12 @@ async function playNextInQueue(interaction, connection) {
     });
 
     console.log(`Now playing ${url}!`);
-    // Send a message to the channel
+    // Send a message to the channel instead of using interaction.followUp()
     await interaction.channel.send(`Now playing ${url}!`);
   } catch (error) {
-    console.error("Error handling interaction:", error);
-    if (interaction.deferred) {
-      await interaction.editReply({
-        content: "There was an error while executing this command.",
-      });
-    } else if (!interaction.replied) {
-      await interaction.reply({
-        content: "There was an error while executing this command.",
-        ephemeral: true,
-      });
-    } else {
-      // Interaction already replied to; send a message to the channel
-      await interaction.channel.send("There was an error while executing this command.");
-    }
+    console.error("Error in audio player:", error);
+    await interaction.channel.send(`There was an error playing the URL: ${url}.`);
+    playNextInQueue(interaction, connection); // Move to the next song in the queue
   }
 }
 
