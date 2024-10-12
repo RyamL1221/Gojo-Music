@@ -152,7 +152,7 @@ client.on("interactionCreate", async (interaction) => {
           player.state.status !== AudioPlayerStatus.Buffering
         ) {
           console.log(`Now playing ${url}!`);
-          await interaction.editReply(`Now playing ${url}!`);
+          await interaction.editReply(`Now playing ${url} !`);
           playNextInQueue(interaction, connection);
         } else {
           console.log(`Added ${url} to queue!`);
