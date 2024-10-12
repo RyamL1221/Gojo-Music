@@ -282,12 +282,10 @@ async function playNextInQueue(interaction, connection) {
     });
 
     console.log(`Now playing ${url}!`);
-    // Send a message to the channel instead of using interaction.followUp()
     await interaction.channel.send(`Now playing ${url}!`);
   } catch (error) {
     console.error("Error in audio player:", error);
     await interaction.channel.send(`There was an error playing the URL: ${url}.`);
-    playNextInQueue(interaction, connection); // Move to the next song in the queue
   }
 }
 
