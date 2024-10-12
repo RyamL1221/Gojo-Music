@@ -60,12 +60,12 @@ const rest = new REST({ version: "10" }).setToken(config.token);
   try {
     console.log("Deleting old application (/) commands.");
     const existingCommands = await rest.get(
-      Routes.applicationGuildCommands(config.clientId, config.guildId),
+      Routes.applicationCommands(config.clientId),
     );
     let count = 0;
     for (const command of existingCommands) {
       await rest.delete(
-        `${Routes.applicationGuildCommands(config.clientId, config.guildId)}/${command.id}`,
+        `${Routes.applicationCommands(config.clientId)}/${command.id}`,
       );
       count++;
     }
@@ -73,7 +73,7 @@ const rest = new REST({ version: "10" }).setToken(config.token);
 
     console.log("Started refreshing application (/) commands.");
     await rest.put(
-      Routes.applicationGuildCommands(config.clientId, config.guildId),
+      Routes.applicationCommands(config.clientId),
       { body: commands },
     );
     console.log("Successfully reloaded application (/) commands.");
