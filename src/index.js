@@ -86,13 +86,6 @@ const player = createAudioPlayer({
 // Initialize the queue
 const queue = new Queue();
 
-// Function to create a new agent with a random IPv6 address
-function createRandomAgent() {
-  return ytdl.createAgent(undefined, {
-    localAddress: getRandomIPv6("2001:2::/48"),
-  });
-}
-
 // Handle interactions
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isCommand()) return;
@@ -206,7 +199,7 @@ async function playNextInQueue(interaction, connection) {
     const stream = await ytdl(url, {
       filter: "audioonly",
       highWaterMark: 1 << 25,
-      requestOptions: { agent },
+      requestOptions: { client: agent },
     });
 
     const resource = createAudioResource(stream, {
@@ -237,3 +230,10 @@ player.on("error", (error) => {
 
 // Login to Discord with token
 client.login(config.token);
+
+// Function to create a new agent with a random IPv6 address
+function createRandomAgent() {
+  return {
+    localAddress: getRandomIPv6("2001:2::/48"),
+  };
+}
