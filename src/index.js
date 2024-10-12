@@ -25,13 +25,11 @@ const http = require("http");
 const cookies = [
   {
     name: "cookie1",
-    value:
-      "MnS5aKFuYaTXOLlQKuZv2vccVWZTefui7emGbLJzRcoTYiPiRD1r1ePU0CgA64Qzn6IM9FZBlUJ4JmefiBYHObn6e4ZWwUZwN1j4Pbfu8SqAABWQKuRUtOdwXKBpO3F9ZrRTqdDYL1jO6cguy3dZ_B2jFt8DZw==",
+    value: config.cookie1_value
   },
   {
     name: "cookie2",
-    value:
-      "MnT8bagx85JBO_xVrK3sOw8PkohV9fRRO7tzRBGfRJ6U7hYLkZRp1nfVG1fBiW9chU7cJI0zTuHW43el1g8T90MV2uA_clgM25mbKp-1nz8TNRrkPNfIW8MMtpu--ibPoWjDJwzUzauspUNskk9aPgC6EmJ8WQ==",
+    value: config.cookie2_value
   },
 ];
 
@@ -132,33 +130,37 @@ client.on("interactionCreate", async (interaction) => {
             ephemeral: true,
           });
         }
-
-        // Defer the reply if processing might take time
+      
+        // Defer the reply immediately to extend the interaction time
         await interaction.deferReply();
-
+      
         // Join the voice channel if not already connected
-        const connection = joinVoiceChannel({
-          channelId: voiceChannel.id,
-          guildId: interaction.guild.id,
-          adapterCreator: interaction.guild.voiceAdapterCreator,
-        });
-
+        let connection = getVoiceConnection(interaction.guild.id);
+        if (!connection) {
+          connection = joinVoiceChannel({
+            channelId: voiceChannel.id,
+            guildId: interaction.guild.id,
+            adapterCreator: interaction.guild.voiceAdapterCreator,
+          });
+        }
+      
         const url = interaction.options.getString("url");
         queue.enqueue(url);
-
+        console.log(`Enqueued: ${url}`);
+      
         if (
           player.state.status !== AudioPlayerStatus.Playing &&
           player.state.status !== AudioPlayerStatus.Buffering
         ) {
+          // Start playing since the player is idle
           console.log(`Now playing ${url}!`);
-          await interaction.editReply(`Now playing ${url} !`);
-          playNextInQueue(interaction, connection);
+          await play(interaction, connection, url);
         } else {
           console.log(`Added ${url} to queue!`);
           await interaction.editReply(`Added ${url} to queue!`);
         }
         break;
-      }
+      }      
       case "disconnect": {
         const voiceChannel = interaction.member.voice.channel;
         if (!voiceChannel) {
@@ -210,51 +212,38 @@ client.on("interactionCreate", async (interaction) => {
     }
   } catch (error) {
     console.error("Error handling interaction:", error);
-    if (interaction.deferred) {
-      try {
-        await interaction.editReply({
-          content: "There was an error while executing this command.",
-        });
-      } catch (editError) {
-        console.error("Failed to edit reply after error:", editError);
-        // As a last resort, try sending a message to the channel
-        try {
-          await interaction.channel.send(
-            "There was an error while executing this command.",
-          );
-        } catch (sendError) {
-          console.error("Failed to send error message to channel:", sendError);
-        }
-      }
-    } else if (!interaction.replied) {
-      try {
-        await interaction.reply({
-          content: "There was an error while executing this command.",
-          ephemeral: true,
-        });
-      } catch (replyError) {
-        console.error("Failed to reply with error:", replyError);
-        // As a last resort, try sending a message to the channel
-        try {
-          await interaction.channel.send(
-            "There was an error while executing this command.",
-          );
-        } catch (sendError) {
-          console.error("Failed to send error message to channel:", sendError);
-        }
-      }
-    } else {
-      // Interaction already replied to; send a message to the channel
-      try {
-        await interaction.channel.send(
-          "There was an error while executing this command.",
-        );
-      } catch (sendError) {
-        console.error("Failed to send error message to channel:", sendError);
-      }
-    }
+    await interaction.reply("There was an error while executing this command.");
   }
 });
+
+// Function to play a song
+async function play(interaction, connection, url) {
+  try {
+    const stream = await ytdl(url, {
+      filter: "audioonly",
+      highWaterMark: 1 << 25,
+      agent,
+    });
+
+    const resource = createAudioResource(stream, {
+      inputType: StreamType.Arbitrary,
+    });
+
+    player.play(resource);
+    connection.subscribe(player);
+
+    player.once(AudioPlayerStatus.Idle, () => {
+      playNextInQueue(interaction, connection);
+    });
+
+    console.log(`Now playing ${url}!`);
+    await interaction.editReply(`Now playing ${url}!`);
+  } catch (error) {
+    console.error("Error in audio player:", error);
+    await interaction.editReply(`There was an error playing the URL: ${url}.`);
+    playNextInQueue(interaction, connection); // Proceed to next song on error
+  }
+}
 
 // Function to play the next song in the queue
 async function playNextInQueue(interaction, connection) {
@@ -262,6 +251,7 @@ async function playNextInQueue(interaction, connection) {
     return;
 
   const url = queue.dequeue();
+
   try {
     const stream = await ytdl(url, {
       filter: "audioonly",
@@ -285,8 +275,10 @@ async function playNextInQueue(interaction, connection) {
   } catch (error) {
     console.error("Error in audio player:", error);
     await interaction.channel.send(`There was an error playing the URL: ${url}.`);
+    playNextInQueue(interaction, connection); // Attempt to play the next song
   }
 }
+
 
 // Handle audio player errors
 player.on("error", (error) => {
