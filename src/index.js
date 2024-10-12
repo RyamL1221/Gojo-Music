@@ -15,6 +15,7 @@ const {
   StreamType,
 } = require("@discordjs/voice");
 const ytdl = require("@distube/ytdl-core");
+const { getRandomIPv6 } = require("@distube/ytdl-core/lib/utils");
 const config = require("../config.json");
 const Queue = require("./Queue.js");
 
@@ -85,6 +86,13 @@ const player = createAudioPlayer({
 // Initialize the queue
 const queue = new Queue();
 
+// Function to create a new agent with a random IPv6 address
+function createRandomAgent() {
+  return ytdl.createAgent(undefined, {
+    localAddress: getRandomIPv6("2001:2::/48"),
+  });
+}
+
 // Handle interactions
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isCommand()) return;
@@ -141,7 +149,7 @@ client.on("interactionCreate", async (interaction) => {
         await interaction.deferReply();
 
         // Disconnect the bot
-        connection = getVoiceConnection(interaction.guild.id);
+        const connection = getVoiceConnection(interaction.guild.id);
         if (connection) {
           connection.destroy();
           queue.clear();
@@ -193,9 +201,12 @@ async function playNextInQueue(interaction, connection) {
 
   const url = queue.dequeue();
   try {
+    // Use a random agent for each request
+    const agent = createRandomAgent();
     const stream = await ytdl(url, {
       filter: "audioonly",
       highWaterMark: 1 << 25,
+      requestOptions: { agent },
     });
 
     const resource = createAudioResource(stream, {
