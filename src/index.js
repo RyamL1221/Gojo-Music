@@ -250,12 +250,23 @@ async function playNextInQueue(interaction, connection) {
     });
 
     console.log(`Now playing ${url}!`);
-    // Optionally notify the user again
-    interaction.followUp(`Now playing ${url}!`);
+    // Send a message to the channel
+    await interaction.channel.send(`Now playing ${url}!`);
   } catch (error) {
-    console.error("Error in audio player:", error);
-    interaction.followUp(`There was an error playing the URL: ${url}.`);
-    playNextInQueue(interaction, connection); // Move to the next song in the queue
+    console.error("Error handling interaction:", error);
+    if (interaction.deferred) {
+      await interaction.editReply({
+        content: "There was an error while executing this command.",
+      });
+    } else if (!interaction.replied) {
+      await interaction.reply({
+        content: "There was an error while executing this command.",
+        ephemeral: true,
+      });
+    } else {
+      // Interaction already replied to; send a message to the channel
+      await interaction.channel.send("There was an error while executing this command.");
+    }
   }
 }
 
