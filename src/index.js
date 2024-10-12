@@ -13,10 +13,25 @@ const {
   NoSubscriberBehavior,
   AudioPlayerStatus,
   StreamType,
+  getVoiceConnection,
 } = require("@discordjs/voice");
 const ytdl = require("@distube/ytdl-core");
 const config = require("../config.json");
 const Queue = require("./Queue.js");
+const http = require("http");
+
+// Cookie setup
+const cookies = [
+  { name: "cookie1", value: "MnS5aKFuYaTXOLlQKuZv2vccVWZTefui7emGbLJzRcoTYiPiRD1r1ePU0CgA64Qzn6IM9FZBlUJ4JmefiBYHObn6e4ZWwUZwN1j4Pbfu8SqAABWQKuRUtOdwXKBpO3F9ZrRTqdDYL1jO6cguy3dZ_B2jFt8DZw==" },
+  { name: "cookie2", value: "MnT8bagx85JBO_xVrK3sOw8PkohV9fRRO7tzRBGfRJ6U7hYLkZRp1nfVG1fBiW9chU7cJI0zTuHW43el1g8T90MV2uA_clgM25mbKp-1nz8TNRrkPNfIW8MMtpu--ibPoWjDJwzUzauspUNskk9aPgC6EmJ8WQ==" },
+];
+
+const agentOptions = {
+  pipelining: 5,
+  maxRedirections: 0,
+};
+
+const agent = ytdl.createAgent(cookies, agentOptions);
 
 // Create a new client instance
 const client = new Client({
@@ -40,22 +55,14 @@ const commands = [
     .setName("play")
     .setDescription("Plays audio from a YouTube link")
     .addStringOption((option) =>
-      option
-        .setName("url")
-        .setDescription("The YouTube URL to play")
-        .setRequired(true)
+      option.setName("url").setDescription("The YouTube URL to play").setRequired(true)
     ),
-  new SlashCommandBuilder()
-    .setName("disconnect")
-    .setDescription("Disconnects the bot from the voice channel"),
-  new SlashCommandBuilder()
-    .setName("skibidi")
-    .setDescription("Only use if you're sigma :nerd:"),
+  new SlashCommandBuilder().setName("disconnect").setDescription("Disconnects the bot from the voice channel"),
+  new SlashCommandBuilder().setName("skibidi").setDescription("Only use if you're sigma :nerd:"),
 ].map((command) => command.toJSON());
 
 // Register slash commands
 const rest = new REST({ version: "10" }).setToken(config.token);
-
 (async () => {
   try {
     console.log("Deleting old application (/) commands.");
@@ -140,13 +147,12 @@ client.on("interactionCreate", async (interaction) => {
         // Defer the reply
         await interaction.deferReply();
 
-        // Disconnect the bot
-        connection = getVoiceConnection(interaction.guild.id);
-        if (connection) {
-          connection.destroy();
-          queue.clear();
-          player.stop();
-          await interaction.editReply("Disconnected from the voice channel.");
+        // Disconnect the user
+        if (voiceChannel) {
+          await interaction.guild.members.cache
+            .get(interaction.member.id)
+            .voice.disconnect();
+            await interaction.editReply("Disconnected from the voice channel.");
         } else {
           await interaction.editReply("I am not connected to any voice channel.");
         }
@@ -196,6 +202,7 @@ async function playNextInQueue(interaction, connection) {
     const stream = await ytdl(url, {
       filter: "audioonly",
       highWaterMark: 1 << 25,
+      agent,
     });
 
     const resource = createAudioResource(stream, {
@@ -226,8 +233,6 @@ player.on("error", (error) => {
 
 // Login to Discord with token
 client.login(config.token);
-
-const http = require("http");
 
 // Create a simple server to keep the bot alive
 const server = http.createServer((req, res) => {
