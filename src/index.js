@@ -43,7 +43,7 @@ const commands = [
       option
         .setName("url")
         .setDescription("The YouTube URL to play")
-        .setRequired(true),
+        .setRequired(true)
     ),
   new SlashCommandBuilder()
     .setName("disconnect")
@@ -59,23 +59,16 @@ const rest = new REST({ version: "10" }).setToken(config.token);
 (async () => {
   try {
     console.log("Deleting old application (/) commands.");
-    const existingCommands = await rest.get(
-      Routes.applicationCommands(config.clientId),
-    );
+    const existingCommands = await rest.get(Routes.applicationCommands(config.clientId));
     let count = 0;
     for (const command of existingCommands) {
-      await rest.delete(
-        `${Routes.applicationCommands(config.clientId)}/${command.id}`,
-      );
+      await rest.delete(`${Routes.applicationCommands(config.clientId)}/${command.id}`);
       count++;
     }
     console.log(`Successfully deleted ${count} old application (/) commands.`);
 
     console.log("Started refreshing application (/) commands.");
-    await rest.put(
-      Routes.applicationCommands(config.clientId),
-      { body: commands },
-    );
+    await rest.put(Routes.applicationCommands(config.clientId), { body: commands });
     console.log("Successfully reloaded application (/) commands.");
   } catch (error) {
     console.error(error);
@@ -92,89 +85,111 @@ const player = createAudioPlayer({
 // Initialize the queue
 const queue = new Queue();
 
-// Global connection and interaction variable
-let currentConnection = null;
-let currentInteraction = null;
-
 // Handle interactions
 client.on("interactionCreate", async (interaction) => {
   if (!interaction.isCommand()) return;
 
-  currentInteraction = interaction;
-
   const { commandName } = interaction;
-  switch (commandName) {
-    case "play": {
-      const voiceChannel = interaction.member.voice.channel;
-      if (!voiceChannel) {
-        return interaction.reply(
-          "You need to be in a voice channel to play music!",
-        );
-      }
 
-      if (!currentConnection) {
-        currentConnection = joinVoiceChannel({
+  try {
+    switch (commandName) {
+      case "play": {
+        const voiceChannel = interaction.member.voice.channel;
+        if (!voiceChannel) {
+          return interaction.reply({
+            content: "You need to be in a voice channel to play music!",
+            ephemeral: true,
+          });
+        }
+
+        // Defer the reply if processing might take time
+        await interaction.deferReply();
+
+        // Join the voice channel if not already connected
+        const connection = joinVoiceChannel({
           channelId: voiceChannel.id,
           guildId: interaction.guild.id,
           adapterCreator: interaction.guild.voiceAdapterCreator,
         });
-      }
 
-      const url = interaction.options.getString("url");
-      queue.enqueue(url);
+        const url = interaction.options.getString("url");
+        queue.enqueue(url);
 
-      if (
-        player.state.status !== AudioPlayerStatus.Playing &&
-        player.state.status !== AudioPlayerStatus.Buffering
-      ) {
-        console.log(`Now playing ${url} !`);
-        await interaction.reply(`Now playing ${url} !`);
-        playNextInQueue();
-      } else {
-        console.log(`Added ${url} to queue!`);
-        await interaction.reply(`Added ${url} to queue!`);
+        if (
+          player.state.status !== AudioPlayerStatus.Playing &&
+          player.state.status !== AudioPlayerStatus.Buffering
+        ) {
+          console.log(`Now playing ${url}!`);
+          await interaction.editReply(`Now playing ${url}!`);
+          playNextInQueue(interaction, connection);
+        } else {
+          console.log(`Added ${url} to queue!`);
+          await interaction.editReply(`Added ${url} to queue!`);
+        }
+        break;
       }
-      break;
-    }
-    case "disconnect": {
-      const voiceChannel = interaction.member.voice.channel;
-      if (voiceChannel) {
-        await interaction.guild.members.cache
-          .get(interaction.member.id)
-          .voice.disconnect();
-        await interaction.reply(
-          "You little skibidi man I'm always too steps ahead",
-        );
-      } else {
-        await interaction.reply("You are not in a voice channel.");
-      }
-      break;
-    }
-    case "skibidi": {
-      if (currentConnection) {
-        queue.clear();
-        currentConnection.destroy();
-        currentConnection = null;
-        currentInteraction = null;
-        player.stop();
-        player.removeAllListeners();
-        player.unpause();
+      case "disconnect": {
+        const voiceChannel = interaction.member.voice.channel;
+        if (!voiceChannel) {
+          return interaction.reply({
+            content: "You are not in a voice channel.",
+            ephemeral: true,
+          });
+        }
 
-        await interaction.reply("Disconnected from the voice channel.");
-      } else {
-        await interaction.reply("I am not connected to a voice channel.");
+        // Defer the reply
+        await interaction.deferReply();
+
+        // Disconnect the bot
+        connection = getVoiceConnection(interaction.guild.id);
+        if (connection) {
+          connection.destroy();
+          queue.clear();
+          player.stop();
+          await interaction.editReply("Disconnected from the voice channel.");
+        } else {
+          await interaction.editReply("I am not connected to any voice channel.");
+        }
+        break;
       }
-      break;
+      case "skibidi": {
+        // Defer the reply
+        await interaction.deferReply();
+
+        const connection = getVoiceConnection(interaction.guild.id);
+        if (connection) {
+          queue.clear();
+          connection.destroy();
+          player.stop();
+          await interaction.editReply("Disconnected from the voice channel.");
+        } else {
+          await interaction.editReply("I am not connected to any voice channel.");
+        }
+        break;
+      }
+      default:
+        await interaction.reply({ content: "Unknown command.", ephemeral: true });
+        break;
     }
-    default:
-      break;
+  } catch (error) {
+    console.error("Error handling interaction:", error);
+    if (interaction.deferred || interaction.replied) {
+      interaction.followUp({
+        content: "There was an error while executing this command.",
+        ephemeral: true,
+      });
+    } else {
+      interaction.reply({
+        content: "There was an error while executing this command.",
+        ephemeral: true,
+      });
+    }
   }
 });
 
 // Function to play the next song in the queue
-async function playNextInQueue() {
-  if (player.state.status === AudioPlayerStatus.Playing || queue.isEmpty())
-    return;
+async function playNextInQueue(interaction, connection) {
+  if (player.state.status === AudioPlayerStatus.Playing || queue.isEmpty()) return;
 
   const url = queue.dequeue();
   try {
@@ -188,17 +203,19 @@ async function playNextInQueue() {
     });
 
     player.play(resource);
-    currentConnection.subscribe(player);
+    connection.subscribe(player);
 
     player.once(AudioPlayerStatus.Idle, () => {
-      playNextInQueue();
+      playNextInQueue(interaction, connection);
     });
+
+    console.log(`Now playing ${url}!`);
+    // Optionally notify the user again
+    interaction.followUp(`Now playing ${url}!`);
   } catch (error) {
     console.error("Error in audio player:", error);
-    currentInteraction.channel.send(
-      `There was an error playing the URL: ${url}.`,
-    );
-    playNextInQueue(); // Move to the next song in the queue
+    interaction.followUp(`There was an error playing the URL: ${url}.`);
+    playNextInQueue(interaction, connection); // Move to the next song in the queue
   }
 }
 
