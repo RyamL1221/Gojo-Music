@@ -21,7 +21,29 @@ const Queue = require("./Queue.js");
 const http = require("http");
 
 // Cookie setup
-const cookies = "MnS5aKFuYaTXOLlQKuZv2vccVWZTefui7emGbLJzRcoTYiPiRD1r1ePU0CgA64Qzn6IM9FZBlUJ4JmefiBYHObn6e4ZWwUZwN1j4Pbfu8SqAABWQKuRUtOdwXKBpO3F9ZrRTqdDYL1jO6cguy3dZ_B2jFt8DZw==; MnT8bagx85JBO_xVrK3sOw8PkohV9fRRO7tzRBGfRJ6U7hYLkZRp1nfVG1fBiW9chU7cJI0zTuHW43el1g8T90MV2uA_clgM25mbKp-1nz8TNRrkPNfIW8MMtpu--ibPoWjDJwzUzauspUNskk9aPgC6EmJ8WQ==";
+
+const cookies = [
+  {
+    name: "cookie1",
+    value:
+      "MnS5aKFuYaTXOLlQKuZv2vccVWZTefui7emGbLJzRcoTYiPiRD1r1ePU0CgA64Qzn6IM9FZBlUJ4JmefiBYHObn6e4ZWwUZwN1j4Pbfu8SqAABWQKuRUtOdwXKBpO3F9ZrRTqdDYL1jO6cguy3dZ_B2jFt8DZw==",
+  },
+  {
+    name: "cookie2",
+    value:
+      "MnT8bagx85JBO_xVrK3sOw8PkohV9fRRO7tzRBGfRJ6U7hYLkZRp1nfVG1fBiW9chU7cJI0zTuHW43el1g8T90MV2uA_clgM25mbKp-1nz8TNRrkPNfIW8MMtpu--ibPoWjDJwzUzauspUNskk9aPgC6EmJ8WQ==",
+  },
+];
+
+// Optional agent options (these are examples and can be adjusted as needed)
+const agentOptions = {
+  pipelining: 5,
+  maxRedirections: 0,
+  localAddress: "127.0.0.1",
+};
+
+// Create the agent once
+const agent = ytdl.createAgent(cookies, agentOptions);
 
 // Create a new client instance
 const client = new Client({
@@ -213,11 +235,7 @@ async function playNextInQueue(interaction, connection) {
     const stream = await ytdl(url, {
       filter: "audioonly",
       highWaterMark: 1 << 25,
-      requestOptions: {
-        headers: {
-          cookie: cookies,
-        },
-      },
+      agent,
     });
 
     const resource = createAudioResource(stream, {
