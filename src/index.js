@@ -5,7 +5,7 @@ const {
   SlashCommandBuilder,
   Routes,
   REST,
-} = require('discord.js');
+} = require("discord.js");
 const {
   joinVoiceChannel,
   createAudioPlayer,
@@ -13,10 +13,10 @@ const {
   NoSubscriberBehavior,
   AudioPlayerStatus,
   StreamType,
-} = require('@discordjs/voice');
-const ytdl = require('@distube/ytdl-core');
-const config = require('../config.json');
-const Queue = require('./Queue.js');
+} = require("@discordjs/voice");
+const ytdl = require("@distube/ytdl-core");
+const config = require("../config.json");
+const Queue = require("./Queue.js");
 
 // Create a new client instance
 const client = new Client({
@@ -28,8 +28,8 @@ const client = new Client({
 });
 
 // ready checks
-client.once('ready', () => {
-  console.log('Ready!');
+client.once("ready", () => {
+  console.log("Ready!");
 });
 client.on("error", console.error);
 client.on("warn", console.warn);
@@ -37,40 +37,46 @@ client.on("warn", console.warn);
 // Define the slash commands
 const commands = [
   new SlashCommandBuilder()
-    .setName('play')
-    .setDescription('Plays audio from a YouTube link')
+    .setName("play")
+    .setDescription("Plays audio from a YouTube link")
     .addStringOption((option) =>
-      option.setName('url').setDescription('The YouTube URL to play').setRequired(true)
+      option
+        .setName("url")
+        .setDescription("The YouTube URL to play")
+        .setRequired(true),
     ),
   new SlashCommandBuilder()
-    .setName('disconnect')
-    .setDescription('Disconnects the bot from the voice channel'),
+    .setName("disconnect")
+    .setDescription("Disconnects the bot from the voice channel"),
   new SlashCommandBuilder()
-    .setName('skibidi')
-    .setDescription('Only use if you\'re sigma :nerd:'),
+    .setName("skibidi")
+    .setDescription("Only use if you're sigma :nerd:"),
 ].map((command) => command.toJSON());
 
 // Register slash commands
-const rest = new REST({ version: '10' }).setToken(config.token);
+const rest = new REST({ version: "10" }).setToken(config.token);
 
 (async () => {
   try {
-    console.log('Deleting old application (/) commands.');
+    console.log("Deleting old application (/) commands.");
     const existingCommands = await rest.get(
-      Routes.applicationGuildCommands(config.clientId, config.guildId)
+      Routes.applicationGuildCommands(config.clientId, config.guildId),
     );
     let count = 0;
     for (const command of existingCommands) {
       await rest.delete(
-        `${Routes.applicationGuildCommands(config.clientId, config.guildId)}/${command.id}`
+        `${Routes.applicationGuildCommands(config.clientId, config.guildId)}/${command.id}`,
       );
       count++;
     }
     console.log(`Successfully deleted ${count} old application (/) commands.`);
 
-    console.log('Started refreshing application (/) commands.');
-    await rest.put(Routes.applicationGuildCommands(config.clientId, config.guildId), { body: commands });
-    console.log('Successfully reloaded application (/) commands.');
+    console.log("Started refreshing application (/) commands.");
+    await rest.put(
+      Routes.applicationGuildCommands(config.clientId, config.guildId),
+      { body: commands },
+    );
+    console.log("Successfully reloaded application (/) commands.");
   } catch (error) {
     console.error(error);
   }
@@ -91,17 +97,19 @@ let currentConnection = null;
 let currentInteraction = null;
 
 // Handle interactions
-client.on('interactionCreate', async (interaction) => {
+client.on("interactionCreate", async (interaction) => {
   if (!interaction.isCommand()) return;
 
   currentInteraction = interaction;
 
   const { commandName } = interaction;
   switch (commandName) {
-    case 'play': {
+    case "play": {
       const voiceChannel = interaction.member.voice.channel;
       if (!voiceChannel) {
-        return interaction.reply('You need to be in a voice channel to play music!');
+        return interaction.reply(
+          "You need to be in a voice channel to play music!",
+        );
       }
 
       if (!currentConnection) {
@@ -112,10 +120,10 @@ client.on('interactionCreate', async (interaction) => {
         });
       }
 
-      const url = interaction.options.getString('url');
+      const url = interaction.options.getString("url");
       queue.enqueue(url);
 
-      if (  
+      if (
         player.state.status !== AudioPlayerStatus.Playing &&
         player.state.status !== AudioPlayerStatus.Buffering
       ) {
@@ -128,19 +136,21 @@ client.on('interactionCreate', async (interaction) => {
       }
       break;
     }
-    case 'disconnect': {
+    case "disconnect": {
       const voiceChannel = interaction.member.voice.channel;
       if (voiceChannel) {
         await interaction.guild.members.cache
           .get(interaction.member.id)
           .voice.disconnect();
-        await interaction.reply('You little skibidi man I\'m always too steps ahead');
+        await interaction.reply(
+          "You little skibidi man I'm always too steps ahead",
+        );
       } else {
-        await interaction.reply('You are not in a voice channel.');
+        await interaction.reply("You are not in a voice channel.");
       }
       break;
     }
-    case 'skibidi': {
+    case "skibidi": {
       if (currentConnection) {
         queue.clear();
         currentConnection.destroy();
@@ -150,9 +160,9 @@ client.on('interactionCreate', async (interaction) => {
         player.removeAllListeners();
         player.unpause();
 
-        await interaction.reply('Disconnected from the voice channel.');
+        await interaction.reply("Disconnected from the voice channel.");
       } else {
-        await interaction.reply('I am not connected to a voice channel.');
+        await interaction.reply("I am not connected to a voice channel.");
       }
       break;
     }
@@ -163,12 +173,13 @@ client.on('interactionCreate', async (interaction) => {
 
 // Function to play the next song in the queue
 async function playNextInQueue() {
-  if (player.state.status === AudioPlayerStatus.Playing || queue.isEmpty()) return;
+  if (player.state.status === AudioPlayerStatus.Playing || queue.isEmpty())
+    return;
 
   const url = queue.dequeue();
   try {
     const stream = await ytdl(url, {
-      filter: 'audioonly',
+      filter: "audioonly",
       highWaterMark: 1 << 25,
     });
 
@@ -183,15 +194,17 @@ async function playNextInQueue() {
       playNextInQueue();
     });
   } catch (error) {
-    console.error('Error in audio player:', error);
-    currentInteraction.channel.send(`There was an error playing the URL: ${url}.`);
+    console.error("Error in audio player:", error);
+    currentInteraction.channel.send(
+      `There was an error playing the URL: ${url}.`,
+    );
     playNextInQueue(); // Move to the next song in the queue
   }
 }
 
 // Handle audio player errors
-player.on('error', (error) => {
-  console.error('Error in audio player:', error);
+player.on("error", (error) => {
+  console.error("Error in audio player:", error);
 });
 
 // Login to Discord with token
