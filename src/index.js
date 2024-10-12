@@ -226,3 +226,16 @@ player.on("error", (error) => {
 
 // Login to Discord with token
 client.login(config.token);
+
+const http = require("http");
+
+// Create a simple server to keep the bot alive
+const server = http.createServer((req, res) => {
+  res.writeHead(200, { "Content-Type": "text/plain" });
+  res.end("Discord bot is running\n");
+});
+
+const PORT = process.env.PORT || 3000; // Use PORT environment variable or default to 3000
+server.listen(PORT, () => {
+  console.log(`Server is listening on port ${PORT}`);
+});
