@@ -38,8 +38,7 @@ const cookies = [
 // Optional agent options (these are examples and can be adjusted as needed)
 const agentOptions = {
   pipelining: 5,
-  maxRedirections: 0,
-  localAddress: "127.0.0.1",
+  maxRedirections: 0
 };
 
 // Create the agent once
@@ -86,19 +85,19 @@ const rest = new REST({ version: "10" }).setToken(config.token);
   try {
     console.log("Deleting old application (/) commands.");
     const existingCommands = await rest.get(
-      Routes.applicationCommands(config.clientId),
+      Routes.applicationGuildCommands(config.clientId, config.guildId),
     );
     let count = 0;
     for (const command of existingCommands) {
       await rest.delete(
-        `${Routes.applicationCommands(config.clientId)}/${command.id}`,
+        `${Routes.applicationGuildCommands(config.clientId, config.guildId)}/${command.id}`,
       );
       count++;
     }
     console.log(`Successfully deleted ${count} old application (/) commands.`);
 
     console.log("Started refreshing application (/) commands.");
-    await rest.put(Routes.applicationCommands(config.clientId), {
+    await rest.put(Routes.applicationGuildCommands(config.clientId, config.guildId), {
       body: commands,
     });
     console.log("Successfully reloaded application (/) commands.");
