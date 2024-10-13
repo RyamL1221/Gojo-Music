@@ -18,29 +18,6 @@ const {
 const ytdl = require("@distube/ytdl-core");
 const config = require("../config.json");
 const Queue = require("./Queue.js");
-const http = require("http");
-
-// Cookie setup
-
-const cookies = [
-  {
-    name: "cookie1",
-    value: config.cookie1_value,
-  },
-  {
-    name: "cookie2",
-    value: config.cookie2_value,
-  },
-];
-
-// Optional agent options (these are examples and can be adjusted as needed)
-const agentOptions = {
-  pipelining: 5,
-  maxRedirections: 1,
-};
-
-// Create the agent once
-const agent = ytdl.createAgent(cookies, agentOptions);
 
 // Create a new client instance
 const client = new Client({
@@ -156,7 +133,7 @@ client.on("interactionCreate", async (interaction) => {
           player.state.status !== AudioPlayerStatus.Buffering
         ) {
           // Start playing since the player is idle
-          console.log(`Now playing ${url}!`);
+          console.log(`Will play ${url} !`);
           await play(interaction, connection, url);
         } else {
           console.log(`Added ${url} to queue!`);
@@ -225,7 +202,6 @@ async function play(interaction, connection, url) {
     const stream = await ytdl(url, {
       filter: "audioonly",
       highWaterMark: 1 << 25,
-      agent,
     });
 
     const resource = createAudioResource(stream, {
@@ -239,8 +215,8 @@ async function play(interaction, connection, url) {
       playNextInQueue(interaction, connection);
     });
 
-    console.log(`Now playing ${url}!`);
-    await interaction.editReply(`Now playing ${url}!`);
+    console.log(`Now playing ${url} !`);
+    await interaction.editReply(`Now playing ${url} !`);
   } catch (error) {
     console.error("Error in audio player:", error);
     await interaction.editReply(`There was an error playing the URL: ${url}.`);
@@ -259,7 +235,6 @@ async function playNextInQueue(interaction, connection) {
     const stream = await ytdl(url, {
       filter: "audioonly",
       highWaterMark: 1 << 25,
-      agent,
     });
 
     const resource = createAudioResource(stream, {
@@ -273,8 +248,8 @@ async function playNextInQueue(interaction, connection) {
       playNextInQueue(interaction, connection);
     });
 
-    console.log(`Now playing ${url}!`);
-    await interaction.channel.send(`Now playing ${url}!`);
+    console.log(`Now playing ${url} !`);
+    await interaction.channel.send(`Now playing ${url} !`);
   } catch (error) {
     console.error("Error in audio player:", error);
     await interaction.channel.send(
@@ -291,14 +266,3 @@ player.on("error", (error) => {
 
 // Login to Discord with token
 client.login(config.token);
-
-// Create a simple server to keep the bot alive
-const server = http.createServer((req, res) => {
-  res.writeHead(200, { "Content-Type": "text/plain" });
-  res.end("Discord bot is running\n");
-});
-
-const PORT = process.env.PORT || 3000; // Use PORT environment variable or default to 3000
-server.listen(PORT, () => {
-  console.log(`Server is listening on port ${PORT}`);
-});
